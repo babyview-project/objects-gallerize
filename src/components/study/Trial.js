@@ -3,6 +3,11 @@ import { InvalidCard } from "../SingleCard";
 import { Button, Layout, Notification} from "element-react";
 import axios from "axios";
 
+const API_URL = process.env.REACT_APP_API_URL;
+
+// Prolific completion URL — update this when starting a new study
+const PROLIFIC_COMPLETION_URL = "https://app.prolific.co/submissions/complete?cc=294B5DC5mmt";
+
 /*
 A Trial contains props.num images from a single category and a check image
 */
@@ -11,7 +16,6 @@ export class Trial extends React.Component {
         super(props);
         this.addInvalid = this.addInvalid.bind(this);
         this.removeInvalid = this.removeInvalid.bind(this);
-
         this.findCheck = this.findCheck.bind(this);
         this.cancelCheck = this.cancelCheck.bind(this);
 
@@ -31,85 +35,60 @@ export class Trial extends React.Component {
     }
 
     findCheck() {
-        this.setState({
-            nextDisable: false
-        })
+        this.setState({ nextDisable: false });
     }
 
     cancelCheck() {
-        this.setState({
-            nextDisable: true
-        })
+        this.setState({ nextDisable: true });
     }
 
     addInvalid(drawing) {
         this.state.invalidDrawings.push(drawing);
-        console.log(this.state.invalidDrawings)
     }
 
     removeInvalid(drawing) {
-        console.log(drawing)
-        let index = this.state.invalidDrawings.findIndex(x => { return x.session_id === drawing.session_id });
-        console.log(index)
+        let index = this.state.invalidDrawings.findIndex(x => x.filename === drawing.filename);
         if (index !== -1) {
             this.state.invalidDrawings.splice(index, 1);
         }
-        console.log(this.state.invalidDrawings)
     }
 
     nextPage() {
-        if (this.state.nextDisable){
+        if (this.state.nextDisable) {
             Notification({
                 title: 'Warning',
                 message: 'There are missing invalid drawings. Please check again!',
                 type: 'warning',
-              });
+            });
             return;
         }
 
-        // for the last trial, change the button text to "Submit the HIT"
         if (this.state.classIdx === this.props.allClasses.length - 1) {
-
-            this.submit_data = []    
-            this.submit_data = {
-                completed: true,
-                workerId: window.turk.PROLIFIC_PID,    
-            }
-            
-            //  for mturk
-            // window.turk.submit(this.submit_data, true)            
-
-
-            //  for prolific
-            window.location.href="https://app.prolific.co/submissions/complete?cc=294B5DC5mmt"
+            window.location.href = PROLIFIC_COMPLETION_URL;
             return;
         }
+
         if (this.state.classIdx === this.props.allClasses.length - 2) {
-            this.setState({
-                buttonText: 'Submit the HIT'
-            })
+            this.setState({ buttonText: 'Submit' });
         }
 
-        //submit data on the current category
         if (this.state.invalidDrawings.length > 0) {
-            axios.post("https://stanford-cogsci.org:8883/db/post-response", this.state.invalidDrawings)
+            axios.post(`${API_URL}/db/post-response`, this.state.invalidDrawings)
                 .then(() => {
-                    this.setState({
-                        invalidDrawings: []
-                    })
+                    this.setState({ invalidDrawings: [] });
                 })
                 .catch(error => {
                     console.log(error);
                 });
         }
 
-        // change category and fetch new data
         let nextIdx = this.state.classIdx + 1;
         let curClass = this.props.allClasses[nextIdx];
+        let prolificPID = new URLSearchParams(window.location.search).get('PROLIFIC_PID') || 'preview';
         let filter = {
             class: curClass,
             num: this.props.num,
-            worker_id: window.turk.PROLIFIC_PID,
+            worker_id: prolificPID,
         };
         this.fetch(filter);
         this.setState({
@@ -128,11 +107,11 @@ export class Trial extends React.Component {
     }
 
     fetch(filter) {
-        axios.post("https://stanford-cogsci.org:8883/db/get-single-class", filter)
+        axios.post(`${API_URL}/db/get-single-class`, filter)
             .then(response => {
                 if (response.data.length > 0) {
                     let toRet = response.data.map(curDraw => {
-                        curDraw['valid'] = 0
+                        curDraw['valid'] = 0;
                         return <InvalidCard
                             input={curDraw}
                             key={curDraw._id}
@@ -144,22 +123,19 @@ export class Trial extends React.Component {
                     });
 
                     let fn = this.state.checkList[this.state.classIdx];
-                    let checkData = { url: require('./check/' + fn), valid: 0, _id: this.state.classIdx, fname: fn, class: filter.class }
+                    let checkData = { url: require('../../assets/check/' + fn), valid: 0, _id: this.state.classIdx, fname: fn, class: filter.class };
                     let checkCard = <InvalidCard
-                            input={checkData}
-                            key={checkData._id}
-                            local={true}
-                            hasCancel={true}
-                            handleCheck={this.findCheck}
-                            cancelCheck={this.cancelCheck} />;
+                        input={checkData}
+                        key={checkData._id}
+                        local={true}
+                        hasCancel={true}
+                        handleCheck={this.findCheck}
+                        cancelCheck={this.cancelCheck} />;
 
                     toRet.push(checkCard);
                     toRet.sort(() => Math.random() - 0.5);
 
-                    this.setState({
-                        toRet: toRet,
-                        curClass: filter.class
-                    });
+                    this.setState({ toRet, curClass: filter.class });
                 }
             })
             .catch((error) => {
@@ -170,11 +146,9 @@ export class Trial extends React.Component {
     render() {
         let refImg = "";
         if (['this square', 'square'].includes(this.state.curClass)) {
-            refImg = require('./reference/square_ref.png');
+            refImg = require('../../assets/reference/square_ref.png');
         } else if (this.state.curClass === 'shape') {
-            refImg = require('./reference/shape_ref.png');
-        } else {
-            refImg = "";
+            refImg = require('../../assets/reference/shape_ref.png');
         }
 
         return (
@@ -188,41 +162,13 @@ export class Trial extends React.Component {
                     </Layout.Row>
 
                     <Layout.Row type="flex" justify="center" style={{ padding: '10px', textAlign: "center" }}>
-                        <Layout.Col span="12"><h3 style={{ textAlign: "center", top: "30px" }}> <p>Please identify all invalid drawings of <b>{this.props.allClasses[this.state.classIdx]}</b></p> </h3></Layout.Col>
-                        <Layout.Col span="12"><h4 style={{ textAlign: "center", top: "30px" }}> <p>Remember that unrecognizable drawings are still valid drawings.</p> </h4></Layout.Col>
-
-                        <Layout.Col span="1"><img src={refImg} style={{ width: '60px' }} /></Layout.Col>
+                        <Layout.Col span="12"><h3 style={{ textAlign: "center", top: "30px" }}><p>Please identify all invalid drawings of <b>{this.props.allClasses[this.state.classIdx]}</b></p></h3></Layout.Col>
+                        <Layout.Col span="12"><h4 style={{ textAlign: "center", top: "30px" }}><p>Remember that unrecognizable drawings are still valid drawings.</p></h4></Layout.Col>
+                        <Layout.Col span="1"><img src={refImg} style={{ width: '60px' }} alt="" /></Layout.Col>
                     </Layout.Row>
                     {this.state.toRet}
                 </div>
-
             </div>
-        )
+        );
     }
-
-    // allDone() {
-    //     refImg = "";
-       
-
-    //     return (
-    //         <div style={{ display: this.state.showPage ? "block" : "none" }}>
-    //             <div>
-    //                 <Layout.Row type="flex" justify="center" style={{ padding: '10px' }}>
-    //                     <Button.Group>
-    //                         <Button onClick={() => this.nextPage()}>{this.state.buttonText}<i className="el-icon-arrow-right el-icon-right"></i></Button>
-    //                     </Button.Group>
-    //                     <div style={{ paddingLeft: '20px' }}> {this.state.classIdx + 1}/{this.props.allClasses.length} </div>
-    //                 </Layout.Row>
-
-    //                 <Layout.Row type="flex" justify="center" style={{ padding: '10px', textAlign: "center" }}>
-    //                     <Layout.Col span="12"><h3 style={{ textAlign: "center", top: "30px" }}> <p>THANK YOU</b></p> </h3></Layout.Col>
-    //                     <Layout.Col span="1"><img src={refImg} style={{ width: '60px' }} /></Layout.Col>
-    //                 </Layout.Row>
-    //                 {this.state.toRet}
-    //             </div>
-
-    //         </div>
-    //     )
-    // }
 }
-

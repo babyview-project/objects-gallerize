@@ -2,14 +2,6 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const responseSchema = new Schema({
-    session_id: {
-        type: String,
-        required: true
-    },
-    age: {
-        type: String,
-        require: true
-    },
     class: {
         type: String,
         required: true
@@ -28,6 +20,6 @@ const responseSchema = new Schema({
     }
 });
 
-const Response = mongoose.model('Response', responseSchema, 'invalid_draw_cdm_run_v7')
+const Response = mongoose.model('Response', responseSchema, 'prolific_responses')
 
 module.exports = Response;

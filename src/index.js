@@ -1,9 +1,10 @@
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 import "./index.css";
-import { MTurk } from "./components/mturk_study/mturk";
+import { Study } from "./components/study/study";
 import "element-theme-default";
 import * as serviceWorker from "./serviceWorker";
 
-ReactDOM.render(<MTurk />, document.getElementById("main"));
+const root = createRoot(document.getElementById("main"));
+root.render(<Study />);
 serviceWorker.unregister();

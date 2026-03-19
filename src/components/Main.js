@@ -3,6 +3,8 @@ import { Select, Input, Button, Radio } from "element-react";
 import { CardLayout } from "./CardLayout";
 import "element-theme-default";
 import axios from "axios";
+
+const API_URL = process.env.REACT_APP_API_URL;
 /* This is the main class including the header */
 class Main extends React.Component {
   constructor(props) {
@@ -19,8 +21,7 @@ class Main extends React.Component {
   }
 
   componentDidMount() {
-    axios.get('http://cogtoolslab.org:8887/db/get-classes')
-      //axios.get('http://localhost:8882/db/get-classes')
+    axios.get(`${API_URL}/db/get-classes`)
       .then(response => {
         var classes = response.data;
         //comment out next two lines

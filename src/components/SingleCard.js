@@ -2,6 +2,8 @@ import React from "react";
 import { Button, Card, Dialog, Alert } from "element-react";
 import axios from "axios";
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 /* 
 The DrawCard component shows a drawing in a card.
 When the user click on the card, detailed information about the drawing is shown in an infor dialog
@@ -98,15 +100,13 @@ class InvalidCard extends React.Component {
   }
 
   getInstanceInfo() {
-    let data = {
-      session_id: this.props.input.session_id,
+    let prolificPID = new URLSearchParams(window.location.search).get('PROLIFIC_PID') || 'preview';
+    return {
       filename: this.props.input.filename,
       class: this.props.input.class,
-      age: this.props.input.age,
       date: new Date(),
-      worker_id: window.turk.PROLIFIC_PID
-    }
-    return data
+      worker_id: prolificPID
+    };
   }
 
   markInvalid() {
@@ -217,8 +217,7 @@ class SingleCard extends React.Component {
 
   update(newValid) {
     axios
-      .put("http://cogtoolslab.org:8887/db/update-data", {
-        //.put("http://localhost:8882/db/update-data", {
+      .put(`${API_URL}/db/update-data`, {
         valid: newValid,
         filename: this.state.item.filename
       })
