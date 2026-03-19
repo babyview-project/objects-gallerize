@@ -1,8 +1,7 @@
 import React from "react";
-import { Layout, Tag, Alert } from "element-react";
+import { Box, Chip } from "@mui/material";
 import { InvalidCard } from "../SingleCard";
 import { Header } from "../helper/header"
-import "element-theme-default";
 import axios from "axios";
 import { Instruction, Timeline } from "./instruction";
 import { Trial } from "./Trial";
@@ -16,6 +15,7 @@ class Study extends React.Component {
             allClasses: [],
         };
         this.enableNextButton = this.enableNextButton.bind(this);
+        this.disableNextButton = this.disableNextButton.bind(this);
         this.redirect = this.redirect.bind(this);
 
         this.intro = React.createRef();
@@ -38,6 +38,10 @@ class Study extends React.Component {
         this.intro.current.enableNext();
     }
 
+    disableNextButton() {
+        this.intro.current.disableNext();
+    }
+
     redirect() {
         this.exp.current.showPage();
     }
@@ -46,67 +50,85 @@ class Study extends React.Component {
         let invalidTag = {
             padding: '0 10px',
             height: '40px',
-            lineHeight: '40px',
             margin: '10px',
             fontSize: '1em'
         }
 
-        let consent = <p>In this task, you will view some drawings made BY CHILDREN of various common objects,
-            such as hats and lamps. Your task is to help us filter the dataset to identify off-task (i.e. "invalid") drawings.
-            <br />
-            Please keep in mind that even if a child's drawing is pretty sloppy and does not look pretty, it
-            is still valid if it looks like the child who made it was at least trying to draw the object.
-            <br />
-            There are a few ways for a drawing to be considered "invalid," namely: (1) The drawing mainly
-            consists of "scribbles"; (2) The canvas is almost entirely blank; (3) The drawing is recognizable, but it is a drawing of something else and it is clear
-            the child was not trying to draw the target object;
-            (4) The drawing contains any words, numbers, arrows, or other symbols that are not part of the object itself; please help us by
-            flagging any inappropriate content as invalid.
-            <br />
-            <br />  PLEASE EXCLUDE AS FEW DRAWINGS AS POSSIBLE —– unrecognizable drawings are still VALID drawings.
-            <br />
-            <br />We expect this task to take approximately 7 minutes to complete, including the time it takes to read instructions.
-            <br /> By answering the following questions, you are participating in a study being performed by cognitive scientists at UCSD.
-            You must be at least 18 years old to participate. Your participation in this research is voluntary.
-            You may decline to answer any or all of the following questions. You may decline further participation, at any time, without adverse consequences.
-            Your anonymity is assured; the researchers who have requested your participation will not receive any personal information about you.
-            <br />If you encounter a problem or error, send us an email and we will make sure you are compensated for your time! Please pay attention and
-            do your best! Thank you!
-            <br />Note: We recommend using Chrome. We have not tested this task in other browsers.
-            </p>
+        let consentPage = <Consent onCheck={this.enableNextButton} onUncheck={this.disableNextButton} />;
 
-        let instruction = <div>
+        let instruction = <Instruction><div>
             <p> Here's how the study will work: </p>
-            <p> On each trial, you will see 24 drawings of a specific category. Your goal is to label all invalid drawings. Invalid drawings include random scribbles, word descriptions, drawings of irrelevant categories and blank drawings.</p>
+            <p> On each trial, you will see 24 detections of a specific category. Your goal is to label all invalid detections. Invalid detections include unrecognizable detections and detections of other categories.</p>
             <p> Example invalid drawings of category <b>CATS</b>: </p>
-            <Layout.Row>
-                <Layout.Col span="8" style={{ textAlign: 'center' }}>
-                    <Tag type="gray" style={invalidTag}>Random Scribbles</Tag>
+            <Box display="flex">
+                <Box flex={1} style={{ textAlign: 'center' }}>
+                    <Chip label="Unrecognizable" style={invalidTag} />
                     <img className="invalid_img" src={require('../../assets/img/scribble.png')} alt="scribble example" />
-                </Layout.Col>
-                <Layout.Col span="8" style={{ textAlign: 'center' }}>
-                    <Tag type="gray" style={invalidTag}>Word Descriptions</Tag>
+                </Box>
+                <Box flex={1} style={{ textAlign: 'center' }}>
+                    <Chip label="Detections of other Categories" style={invalidTag} />
                     <img className="invalid_img" src={require('../../assets/img/letter.png')} alt="letter example" />
-                </Layout.Col>
-                <Layout.Col span="8" style={{ textAlign: 'center' }}>
-                    <Tag type="gray" style={invalidTag}>Drawings of Irrelevant Categories</Tag>
+                </Box>
+                <Box flex={1} style={{ textAlign: 'center' }}>
+                    <Chip label="Detections of other Categories" style={invalidTag} />
                     <img className="invalid_img" src={require('../../assets/img/lamp.png')} alt="lamp example" />
-                </Layout.Col>
-            </Layout.Row>
+                </Box>
+            </Box>
             <p>When you finish, please click the submit button to complete the study.</p>
             <p>Let's try a practice trial!</p>
-        </div>;
+        </div></Instruction>;
 
-        let consentPage = <Instruction>{consent}</Instruction>
-        let instructionPage = <Instruction>{instruction}</Instruction>
         let samplePage = <Practice onChildUpdate={this.enableNextButton} />
-        let pages = [consentPage, instructionPage, samplePage];
+        let pages = [consentPage, instruction, samplePage];
 
         return (
             <div>
-                <Header title="Drawing Validation Study" />
+                <Header title="Object detection validation study" />
                 <Timeline ref={this.intro} pages={pages} showPage={true} finalText="Start the Study" redirect={this.redirect} />
                 <Trial ref={this.exp} allClasses={this.state.allClasses} showPage={false} finalText="Finish" num={23} />
+            </div>
+        );
+    }
+}
+
+class Consent extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { checked: false };
+    }
+
+    handleCheck(e) {
+        const checked = e.target.checked;
+        this.setState({ checked });
+        if (checked) {
+            this.props.onCheck();
+        } else {
+            this.props.onUncheck();
+        }
+    }
+
+    render() {
+        return (
+            <div style={{ padding: '30px', maxWidth: '800px', margin: 'auto', lineHeight: '1.6', fontSize: '18px' }}>
+                <h2>Consent</h2>
+                <p>By answering the following questions, you are participating in a study being performed by cognitive scientists
+                in the Stanford Department of Psychology. If you have questions about this research, please contact Michael C. Frank
+                at mcfrank@stanford.edu. If you are not satisfied with how this study is being conducted, or if you have any concerns,
+                complaints, or general questions about the research or your rights as a participant, please contact the Stanford
+                Institutional Review Board (IRB) to speak to someone independent of the research team at irbnonmed@stanford.edu.
+                Your participation in this research is voluntary. You may decline to answer any or all of the following questions.
+                You may decline further participation, at any time, without adverse consequences. Your confidentiality is assured;
+                the researchers who have requested your participation will not receive any personal information about you.</p>
+                <p>Additionally, you agree to not redistribute any data from this study, and to not reidentify any participants within this study.</p>
+                <label style={{ marginTop: '25px', gap: '12px', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                        type="checkbox"
+                        checked={this.state.checked}
+                        onChange={this.handleCheck.bind(this)}
+                        style={{ transform: 'scale(2)', accentColor: '#444' }}
+                    />
+                    <span>&nbsp;&nbsp;I agree to participate</span>
+                </label>
             </div>
         );
     }

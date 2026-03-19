@@ -1,6 +1,6 @@
 import React from "react";
 import { InvalidCard } from "../SingleCard";
-import { Button, Layout, Notification} from "element-react";
+import { Button, Box, Snackbar, Alert } from "@mui/material";
 import axios from "axios";
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -31,6 +31,7 @@ export class Trial extends React.Component {
             invalidDrawings: [],
             curClass: '',
             checkList: checkFiles,
+            snackbarOpen: false,
         }
     }
 
@@ -55,11 +56,7 @@ export class Trial extends React.Component {
 
     nextPage() {
         if (this.state.nextDisable) {
-            Notification({
-                title: 'Warning',
-                message: 'There are missing invalid drawings. Please check again!',
-                type: 'warning',
-            });
+            this.setState({ snackbarOpen: true });
             return;
         }
 
@@ -154,20 +151,29 @@ export class Trial extends React.Component {
         return (
             <div style={{ display: this.state.showPage ? "block" : "none" }}>
                 <div>
-                    <Layout.Row type="flex" justify="center" style={{ padding: '10px' }}>
-                        <Button.Group>
-                            <Button onClick={() => this.nextPage()}>{this.state.buttonText}<i className="el-icon-arrow-right el-icon-right"></i></Button>
-                        </Button.Group>
+                    <Box display="flex" justifyContent="center" alignItems="center" style={{ padding: '10px' }}>
+                        <Button variant="contained" onClick={() => this.nextPage()}>{this.state.buttonText}</Button>
                         <div style={{ paddingLeft: '20px' }}> {this.state.classIdx + 1}/{this.props.allClasses.length} </div>
-                    </Layout.Row>
+                    </Box>
 
-                    <Layout.Row type="flex" justify="center" style={{ padding: '10px', textAlign: "center" }}>
-                        <Layout.Col span="12"><h3 style={{ textAlign: "center", top: "30px" }}><p>Please identify all invalid drawings of <b>{this.props.allClasses[this.state.classIdx]}</b></p></h3></Layout.Col>
-                        <Layout.Col span="12"><h4 style={{ textAlign: "center", top: "30px" }}><p>Remember that unrecognizable drawings are still valid drawings.</p></h4></Layout.Col>
-                        <Layout.Col span="1"><img src={refImg} style={{ width: '60px' }} alt="" /></Layout.Col>
-                    </Layout.Row>
+                    <Box display="flex" justifyContent="center" alignItems="center" style={{ padding: '10px', textAlign: "center" }}>
+                        <Box flex={1}><h3 style={{ textAlign: "center", top: "30px" }}><p>Please identify all invalid drawings of <b>{this.props.allClasses[this.state.classIdx]}</b></p></h3></Box>
+                        <Box flex={1}><h4 style={{ textAlign: "center", top: "30px" }}><p>Remember that unrecognizable drawings are still valid drawings.</p></h4></Box>
+                        <Box><img src={refImg} style={{ width: '60px' }} alt="" /></Box>
+                    </Box>
                     {this.state.toRet}
                 </div>
+
+                <Snackbar
+                    open={this.state.snackbarOpen}
+                    autoHideDuration={4000}
+                    onClose={() => this.setState({ snackbarOpen: false })}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                >
+                    <Alert severity="warning" onClose={() => this.setState({ snackbarOpen: false })}>
+                        There are missing invalid drawings. Please check again!
+                    </Alert>
+                </Snackbar>
             </div>
         );
     }

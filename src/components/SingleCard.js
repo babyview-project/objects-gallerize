@@ -1,16 +1,13 @@
 import React from "react";
-import { Button, Card, Dialog, Alert } from "element-react";
+import { Button, Card, CardContent, Dialog, DialogTitle, DialogContent, Alert } from "@mui/material";
 import axios from "axios";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-/* 
+/*
 The DrawCard component shows a drawing in a card.
-When the user click on the card, detailed information about the drawing is shown in an infor dialog
-input: action button and related data modification functions 
+When the user click on the card, detailed information about the drawing is shown in an info dialog
 */
-
-
 class DrawCard extends React.Component {
   constructor(props) {
     super(props);
@@ -31,46 +28,44 @@ class DrawCard extends React.Component {
       <Card
         className="single"
         key={this.state.item.filename}
-        bodyStyle={{ padding: 5, width: '180px', height: '200px' }}
+        sx={{ display: 'inline-block', margin: '5px', verticalAlign: 'top' }}
       >
-        <PicLink
-          popUp={this.popUp.bind(this)}
-          valid={this.props.value}
-          url={this.state.item.url}
-        />
+        <CardContent sx={{ padding: '5px !important', width: '180px', minHeight: '200px' }}>
+          <PicLink
+            popUp={this.popUp.bind(this)}
+            valid={this.props.value}
+            url={this.state.item.url}
+          />
 
-        <Dialog
-          title="Detailed Information"
-
-          visible={this.state.dialogVisible}
-          onCancel={() => this.setState({ dialogVisible: false })}
-          lockScroll={false}
-        >
-          <Dialog.Body>
-            <p> {"File name: " + this.state.item.filename} </p>
-            <p> {"Age: " + this.state.item.age}</p>
-            <p> {"GameID: " + this.state.item.gameID} </p>
-            <p> {"Class: " + this.state.item.class}</p>
-            <p> {"repetition: " + this.state.item.repetition}</p>
-            <p> {"trialNUm: " + this.state.item.trialNum}</p>
-            <p> {"Condition: " + this.state.item.condition}</p>
-            <img
-              style={{ display: "block", width: "50%", height: "50%", margin: "auto" }}
-              src={this.state.item.url}
-              alt={"img"}
-            />
-          </Dialog.Body>
-          <Dialog.Footer className="dialog-footer" />
-        </Dialog>
-        {this.props.children}
+          <Dialog
+            open={this.state.dialogVisible}
+            onClose={() => this.setState({ dialogVisible: false })}
+          >
+            <DialogTitle>Detailed Information</DialogTitle>
+            <DialogContent>
+              <p> {"File name: " + this.state.item.filename} </p>
+              <p> {"Age: " + this.state.item.age}</p>
+              <p> {"GameID: " + this.state.item.gameID} </p>
+              <p> {"Class: " + this.state.item.class}</p>
+              <p> {"repetition: " + this.state.item.repetition}</p>
+              <p> {"trialNUm: " + this.state.item.trialNum}</p>
+              <p> {"Condition: " + this.state.item.condition}</p>
+              <img
+                style={{ display: "block", width: "50%", height: "50%", margin: "auto" }}
+                src={this.state.item.url}
+                alt={"img"}
+              />
+            </DialogContent>
+          </Dialog>
+          {this.props.children}
+        </CardContent>
       </Card>
     );
   }
 }
 
 /*
-The InvalidCard component allows users to label a drawing as invalid. After clicking on the invalid button, the card 
-will either show a cancel button to change the validity of the current drawing or show an alert message.
+The InvalidCard component allows users to label a drawing as invalid.
 
 - props.local: whether the card takes local images
 
@@ -123,37 +118,31 @@ class InvalidCard extends React.Component {
       invalidShow: true,
       cancelShow: false,
       value: 0
-    })
+    });
 
     if (this.props.local) {
       this.props.cancelCheck();
-    }else{
+    } else {
       this.props.cancelInvalid(this.getInstanceInfo());
     }
   }
 
   update() {
     if (!this.props.local) {
-      this.markInvalid()
-
+      this.markInvalid();
     } else {
-
       if (this.props.hasAlert) {
-        if (this.props.alertType == "error"){
+        if (this.props.alertType === "error") {
           this.props.handleAlertCard();
-          this.setState({
-            value: -1
-          })
+          this.setState({ value: -1 });
         }
-        
         this.setState({
           alertShow: true,
           invalidShow: false
-        })
+        });
+      }
 
-      } 
-      
-      if (this.props.hasCancel){
+      if (this.props.hasCancel) {
         this.props.handleCheck();
         this.setState({
           cancelShow: true,
@@ -167,39 +156,37 @@ class InvalidCard extends React.Component {
   render() {
     return (
       <DrawCard input={this.props.input} popUp={false} value={this.state.value}>
-        <Alert
-          title={this.props.invalidMsg || ""}
-          type={this.props.alertType}
-          closable={false}
-          style={{ display: this.state.alertShow?"block":"none", lineHeight: 1, padding: '2px', marginTop: '10px' }}
-        />
-        <div style={{ padding: 14 }}>
-          <p style={{ display: "inline" }}>{this.state.item.class}</p>
-          <div style={{ marginTop: "10px" }}>
-            <Button
-              style={{ float: "left", display: this.state.cancelShow ? "block" : "none" }}
-              size="small"
-              plain={this.state.value !== 0}
-              onClick={e => {
-                this.cancelInvalid();
-              }}
-            >
-              Cancel
-                        </Button>
-
-            <Button
-              style={{ float: "right", display: this.state.invalidShow ? "block" : "none" }}
-              size="small"
-              type="danger"
-              plain={this.state.value !== 0}
-              onClick={e => {
-                this.update();
-              }}
-            >
-              Invalid
-                        </Button>
+        {this.state.alertShow && (
+          <Alert
+            severity={this.props.alertType === 'error' ? 'error' : 'warning'}
+            sx={{ lineHeight: 1, padding: '2px', marginTop: '10px' }}
+          >
+            {this.props.invalidMsg || ""}
+          </Alert>
+        )}
+        <div style={{ padding: '8px 0' }}>
+          <p style={{ display: "inline", margin: 0 }}>{this.state.item.class}</p>
+          <div style={{ marginTop: "10px", display: 'flex', justifyContent: 'space-between' }}>
+            {this.state.cancelShow && (
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => this.cancelInvalid()}
+              >
+                Cancel
+              </Button>
+            )}
+            {this.state.invalidShow && (
+              <Button
+                size="small"
+                variant="contained"
+                color="error"
+                onClick={() => this.update()}
+              >
+                Invalid
+              </Button>
+            )}
           </div>
-          <br />
         </div>
       </DrawCard>
     );
@@ -223,9 +210,7 @@ class SingleCard extends React.Component {
       })
       .then(response => {
         if (response.status === 200) {
-          this.setState({
-            value: newValid
-          });
+          this.setState({ value: newValid });
         }
       })
       .catch(error => {
@@ -236,36 +221,25 @@ class SingleCard extends React.Component {
   render() {
     return (
       <DrawCard input={this.props.input} popUp={false} value={this.state.value}>
-        <div style={{ padding: 14 }}>
-          <p style={{ display: "inline" }}>{this.state.item.class}</p>
-          {/*
-          <p style={{ display: "inline", marginLeft: "20px" }}>
-            age: {this.state.item.age}
-          </p>
-                          */}
-          <div style={{ marginTop: "10px" }}>
+        <div style={{ padding: '8px 0' }}>
+          <p style={{ display: "inline", margin: 0 }}>{this.state.item.class}</p>
+          <div style={{ marginTop: "10px", display: 'flex', justifyContent: 'space-between' }}>
             <Button
-              style={{ float: "left"}}
               size="small"
-              type="success"
-              plain={this.state.value !== 0}
-              onClick={e => {
-                this.update(1);
-              }}
+              variant="contained"
+              color="success"
+              onClick={() => this.update(1)}
             >
               valid
-                        </Button>
+            </Button>
             <Button
-              style={{ float: "right"}}
               size="small"
-              type="danger"
-              plain={this.state.value !== 0}
-              onClick={e => {
-                this.update(-1);
-              }}
+              variant="contained"
+              color="error"
+              onClick={() => this.update(-1)}
             >
               Invalid
-                        </Button>
+            </Button>
           </div>
           <br />
         </div>
@@ -276,48 +250,26 @@ class SingleCard extends React.Component {
 
 class PicLink extends React.Component {
   render() {
-    //Unchecked images
     if (this.props.valid === 0) {
       return (
         <div>
-          <img
-            onClick={() => {
-              this.props.popUp();
-            }}
-            src={this.props.url}
-            alt="Kid Draw"
-          />
+          <img onClick={() => this.props.popUp()} src={this.props.url} alt="Kid Draw" />
         </div>
       );
     }
-    //Those have been marked as valid
     if (this.props.valid === 1) {
       return (
         <div className="valid">
-          <img
-            onClick={() => {
-              this.props.popUp();
-            }}
-            src={this.props.url}
-            alt="Kid Draw"
-          />
+          <img onClick={() => this.props.popUp()} src={this.props.url} alt="Kid Draw" />
         </div>
       );
     }
-
-    //Those have been marked as invalid
     return (
       <div className="invalid">
-        <img
-          onClick={() => {
-            this.props.popUp();
-          }}
-          src={this.props.url}
-          alt="Kid Draw"
-        />
+        <img onClick={() => this.props.popUp()} src={this.props.url} alt="Kid Draw" />
       </div>
     );
   }
 }
 
-export { SingleCard, InvalidCard};
+export { SingleCard, InvalidCard };
