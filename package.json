@@ -34,7 +34,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "PUBLIC_URL=/gallerize react-scripts build",
+    "build": "PUBLIC_URL=/gallerize GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test"
   },
   "eslintConfig": {

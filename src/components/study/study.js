@@ -13,6 +13,7 @@ class Study extends React.Component {
         super(props);
         this.state = {
             allClasses: [],
+            shuffledIndex: null
         };
         this.enableNextButton = this.enableNextButton.bind(this);
         this.disableNextButton = this.disableNextButton.bind(this);
@@ -23,15 +24,28 @@ class Study extends React.Component {
     }
 
     componentDidMount() {
-        axios.get(`${API_URL}/db/get-classes`)
+        const worker_id = new URLSearchParams(window.location.search).get('PROLIFIC_PID') || 'preview';
+
+        const assignIndex = axios.post(`${API_URL}/db/assign-worker-index`, { worker_id })
+            .then(response => {
+                console.log(`assigned shuffled_index: ${response.data.shuffled_index}`);
+                this.setState({ shuffledIndex: response.data.shuffled_index });
+            })
+            .catch(error => {
+                console.log('error assigning worker index:', error);
+            });
+
+        const getClasses = axios.get(`${API_URL}/db/get-classes`)
             .then(response => {
                 let classes = response.data;
                 classes.sort(() => Math.random() - 0.5);
                 this.setState({ allClasses: classes });
             })
-            .catch((error) => {
+            .catch(error => {
                 console.log(error);
             });
+
+        Promise.all([assignIndex, getClasses]);
     }
 
     enableNextButton() {
@@ -59,19 +73,25 @@ class Study extends React.Component {
         let instruction = <Instruction><div>
             <p> Here's how the study will work: </p>
             <p> On each trial, you will see 24 detections of a specific category. Your goal is to label all invalid detections. Invalid detections include unrecognizable detections and detections of other categories.</p>
-            <p> Example invalid drawings of category <b>CATS</b>: </p>
+            <p> Example invalid detections of category <b>PENCIL</b>: </p>
             <Box display="flex">
                 <Box flex={1} style={{ textAlign: 'center' }}>
                     <Chip label="Unrecognizable" style={invalidTag} />
-                    <img className="invalid_img" src={require('../../assets/img/scribble.png')} alt="scribble example" />
+                    <div className="image-box" style={{ margin: '0 auto' }}>
+                        <img src={require('../../assets/img/red.png')} alt="red example" />
+                    </div>
                 </Box>
                 <Box flex={1} style={{ textAlign: 'center' }}>
                     <Chip label="Detections of other Categories" style={invalidTag} />
-                    <img className="invalid_img" src={require('../../assets/img/letter.png')} alt="letter example" />
+                    <div className="image-box" style={{ margin: '0 auto' }}>
+                        <img src={require('../../assets/img/chalk.png')} alt="other cat example 1" />
+                    </div>
                 </Box>
                 <Box flex={1} style={{ textAlign: 'center' }}>
                     <Chip label="Detections of other Categories" style={invalidTag} />
-                    <img className="invalid_img" src={require('../../assets/img/lamp.png')} alt="lamp example" />
+                    <div className="image-box" style={{ margin: '0 auto' }}>
+                        <img src={require('../../assets/img/brush.png')} alt="other cat example 2" />
+                    </div>
                 </Box>
             </Box>
             <p>When you finish, please click the submit button to complete the study.</p>
@@ -85,7 +105,7 @@ class Study extends React.Component {
             <div>
                 <Header title="Object detection validation study" />
                 <Timeline ref={this.intro} pages={pages} showPage={true} finalText="Start the Study" redirect={this.redirect} />
-                <Trial ref={this.exp} allClasses={this.state.allClasses} showPage={false} finalText="Finish" num={23} />
+                <Trial ref={this.exp} allClasses={this.state.allClasses} showPage={false} finalText="Finish" shuffledIndex={this.state.shuffledIndex} num={25} />
             </div>
         );
     }
@@ -112,10 +132,10 @@ class Consent extends React.Component {
             <div style={{ padding: '30px', maxWidth: '800px', margin: 'auto', lineHeight: '1.6', fontSize: '18px' }}>
                 <h2>Consent</h2>
                 <p>By answering the following questions, you are participating in a study being performed by cognitive scientists
-                in the Stanford Department of Psychology. If you have questions about this research, please contact Michael C. Frank
-                at mcfrank@stanford.edu. If you are not satisfied with how this study is being conducted, or if you have any concerns,
-                complaints, or general questions about the research or your rights as a participant, please contact the Stanford
-                Institutional Review Board (IRB) to speak to someone independent of the research team at irbnonmed@stanford.edu.
+                in the University of California, San Diego Department of Psychology. If you have questions about this research, please contact Bria Long
+                at brlong@ucsd.edu. If you are not satisfied with how this study is being conducted, or if you have any concerns,
+                complaints, or general questions about the research or your rights as a participant, please contact the University of California, San Diego
+                Institutional Review Board (IRB) to speak to someone independent of the research team at irb@ucsd.edu.
                 Your participation in this research is voluntary. You may decline to answer any or all of the following questions.
                 You may decline further participation, at any time, without adverse consequences. Your confidentiality is assured;
                 the researchers who have requested your participation will not receive any personal information about you.</p>
@@ -140,13 +160,13 @@ class Practice extends React.Component {
         this.state = {
             invalid_count: 0,
             toRet: [],
-            message: <p>Please identify all invalid drawings of <b>CAMELS</b></p>,
+            message: <p>Please identify all invalid detections of <b>TABLES</b></p>,
         }
         this.handleChildClick = this.handleChildClick.bind(this);
     }
 
     componentDidMount() {
-        let fnames = Array.from({length:19}, (x,i) => i.toString() + '.png');
+        let fnames = Array.from({length:10}, (x,i) => i.toString() + '.jpg');
         let invalidF = Array.from({length:5}, (x,i) => "invalid" + i.toString() + ".png");
         fnames = fnames.concat(invalidF);
         fnames.sort(() => Math.random() - 0.5);
@@ -160,22 +180,22 @@ class Practice extends React.Component {
 
             switch (curDraw.fname) {
                 case 'invalid0.png':
-                    invalidMsg = "Yes! Random scribbles are invalid";
+                    invalidMsg = "Yes! Detections of irrelevant categories are invalid";
                     break;
                 case 'invalid1.png':
-                    invalidMsg = "Yes! Word descriptions are invalid";
+                    invalidMsg = "Yes! Detections of irrelevant categories are invalid";
                     break;
                 case 'invalid2.png':
-                    invalidMsg = "Yes! Drawings of irrelevant categories are invalid";
+                    invalidMsg = "Yes! Empty detections are invalid";
                     break;
                 case 'invalid3.png':
-                    invalidMsg = "Yes! Drawings of irrelevant categories are invalid";
+                    invalidMsg = "Yes! Detections of irrelevant categories are invalid";
                     break;
                 case 'invalid4.png':
-                    invalidMsg = "Yes! Empty images are invalid";
+                    invalidMsg = "Yes! Blurry and unrecognizable detections are invalid";
                     break;
                 default:
-                    invalidMsg = "This is a valid drawing!";
+                    invalidMsg = "This is a valid detection!";
                     alertType = 'warning';
             }
 
@@ -199,7 +219,7 @@ class Practice extends React.Component {
     componentDidUpdate() {
         if (this.state.invalid_count === 5) {
             this.setState({
-                message: "You have found all invalid drawings in this trial! Let's start the study!",
+                message: "You have found all invalid detections in this trial! Let's start the study!",
                 invalid_count: -1
             });
             this.props.onChildUpdate();

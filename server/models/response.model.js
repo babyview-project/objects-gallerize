@@ -10,6 +10,10 @@ const responseSchema = new Schema({
         type: String,
         required: true
     },
+    shuffled_index: {
+        type: Number,
+        required: true
+    },
     worker_id:{
         type: String,
         required: true
@@ -17,6 +21,14 @@ const responseSchema = new Schema({
     date: {
         type: Date,
         required: true
+    },
+    trial_type: {
+        type: String,
+        required: false
+    },
+    reaction_time: {
+        type: Number,
+        required: false
     }
 });
 

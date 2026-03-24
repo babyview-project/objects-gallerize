@@ -16,6 +16,7 @@ auth.py
 *.json
 *.svg
 *.csv
+*.jpg
 
 .ipynb_checkpoints/
 

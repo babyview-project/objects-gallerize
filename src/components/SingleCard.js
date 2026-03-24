@@ -2,12 +2,11 @@ import React from "react";
 import { Button, Card, CardContent, Dialog, DialogTitle, DialogContent, Alert } from "@mui/material";
 import axios from "axios";
 
-const API_URL = process.env.REACT_APP_API_URL;
+const apiClient = axios.create({
+  baseURL: process.env.REACT_APP_API_URL,
+  headers: { 'x-api-key': process.env.REACT_APP_API_KEY }
+});
 
-/*
-The DrawCard component shows a drawing in a card.
-When the user click on the card, detailed information about the drawing is shown in an info dialog
-*/
 class DrawCard extends React.Component {
   constructor(props) {
     super(props);
@@ -15,6 +14,54 @@ class DrawCard extends React.Component {
       item: this.props.input,
       dialogVisible: false,
     };
+  }
+
+  fetchImage() {
+    const url = this.props.input.url;
+    if (!url) return;
+
+    if (url.startsWith('data:') || url.startsWith('blob:')) {
+      this.setState({ blobUrl: url });
+      return;
+    }
+
+    if (url.startsWith('image/')) {
+      this.setState({ blobUrl: `data:${url}` });
+      return;
+    }
+
+    // static assets — use directly as src, no auth needed
+    if (url.includes('/static/')) {
+      this.setState({ blobUrl: url });
+      return;
+    }
+    // strip /gallerize prefix to avoid doubling with baseURL
+    const path = url.replace(/^\/gallerize/, '');
+
+    apiClient.get(path, { responseType: 'blob' })
+      .then(res => {
+        this.setState({ blobUrl: URL.createObjectURL(res.data) });
+      })
+      .catch(err => console.error('Failed to load image:', err));
+  }
+
+  componentDidMount() {
+    this.fetchImage();
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.input.url !== this.props.input.url) {
+      if (this.state.blobUrl && this.state.blobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(this.state.blobUrl);
+      }
+      this.setState({ blobUrl: null }, () => this.fetchImage());
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.state.blobUrl && this.state.blobUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(this.state.blobUrl);
+    }
   }
 
   popUp() {
@@ -30,30 +77,29 @@ class DrawCard extends React.Component {
         key={this.state.item.filename}
         sx={{ display: 'inline-block', margin: '5px', verticalAlign: 'top' }}
       >
-        <CardContent sx={{ padding: '5px !important', width: '180px', minHeight: '200px' }}>
+        <CardContent sx={{ padding: '5px !important', width: '180px' }}>
           <PicLink
             popUp={this.popUp.bind(this)}
             valid={this.props.value}
-            url={this.state.item.url}
+            url={this.state.blobUrl}
           />
-
           <Dialog
             open={this.state.dialogVisible}
             onClose={() => this.setState({ dialogVisible: false })}
           >
             <DialogTitle>Detailed Information</DialogTitle>
             <DialogContent>
-              <p> {"File name: " + this.state.item.filename} </p>
-              <p> {"Age: " + this.state.item.age}</p>
-              <p> {"GameID: " + this.state.item.gameID} </p>
-              <p> {"Class: " + this.state.item.class}</p>
-              <p> {"repetition: " + this.state.item.repetition}</p>
-              <p> {"trialNUm: " + this.state.item.trialNum}</p>
-              <p> {"Condition: " + this.state.item.condition}</p>
+              <p>{"File name: " + this.state.item.filename}</p>
+              <p>{"Age: " + this.state.item.age}</p>
+              <p>{"GameID: " + this.state.item.gameID}</p>
+              <p>{"Class: " + this.state.item.class}</p>
+              <p>{"repetition: " + this.state.item.repetition}</p>
+              <p>{"trialNum: " + this.state.item.trialNum}</p>
+              <p>{"Condition: " + this.state.item.condition}</p>
               <img
                 style={{ display: "block", width: "50%", height: "50%", margin: "auto" }}
-                src={this.state.item.url}
-                alt={"img"}
+                src={this.state.blobUrl}
+                alt="img"
               />
             </DialogContent>
           </Dialog>
@@ -64,24 +110,6 @@ class DrawCard extends React.Component {
   }
 }
 
-/*
-The InvalidCard component allows users to label a drawing as invalid.
-
-- props.local: whether the card takes local images
-
-Local Card 1: Practice Card
-- props.hasAlert: whether the card shows an alert message after clicking on the invalid button
-- props.handleAlertCard: callback of the parent to deal with actions after the alert shows up
-
-Local Card 2: Check Card
-- props.hasCancel: whether the card shows a cancel button after clicking on the invalid button
-- props.handleCheck: the parent component's actions after the check card is labeled as invalid
-- props.cancelCheck: the parent component's actions after the invalid state of the card is reverted
-
-Non-Local Card/Real Trial Card
-- props.handleInvalid
-- props.cancelInvalid
-*/
 class InvalidCard extends React.Component {
   constructor(props) {
     super(props);
@@ -99,27 +127,18 @@ class InvalidCard extends React.Component {
     return {
       filename: this.props.input.filename,
       class: this.props.input.class,
-      date: new Date(),
+      shuffled_index: this.props.input.shuffled_index,
       worker_id: prolificPID
     };
   }
 
   markInvalid() {
-    this.setState({
-      value: -1,
-      invalidShow: false,
-      cancelShow: true
-    });
+    this.setState({ value: -1, invalidShow: false, cancelShow: true });
     this.props.handleInvalid(this.getInstanceInfo());
   }
 
   cancelInvalid() {
-    this.setState({
-      invalidShow: true,
-      cancelShow: false,
-      value: 0
-    });
-
+    this.setState({ invalidShow: true, cancelShow: false, value: 0 });
     if (this.props.local) {
       this.props.cancelCheck();
     } else {
@@ -136,19 +155,11 @@ class InvalidCard extends React.Component {
           this.props.handleAlertCard();
           this.setState({ value: -1 });
         }
-        this.setState({
-          alertShow: true,
-          invalidShow: false
-        });
+        this.setState({ alertShow: true, invalidShow: false });
       }
-
       if (this.props.hasCancel) {
         this.props.handleCheck();
-        this.setState({
-          cancelShow: true,
-          invalidShow: false,
-          value: -1
-        });
+        this.setState({ cancelShow: true, invalidShow: false, value: -1 });
       }
     }
   }
@@ -168,21 +179,12 @@ class InvalidCard extends React.Component {
           <p style={{ display: "inline", margin: 0 }}>{this.state.item.class}</p>
           <div style={{ marginTop: "10px", display: 'flex', justifyContent: 'space-between' }}>
             {this.state.cancelShow && (
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => this.cancelInvalid()}
-              >
+              <Button size="small" variant="outlined" onClick={() => this.cancelInvalid()}>
                 Cancel
               </Button>
             )}
             {this.state.invalidShow && (
-              <Button
-                size="small"
-                variant="contained"
-                color="error"
-                onClick={() => this.update()}
-              >
+              <Button size="small" variant="contained" color="error" onClick={() => this.update()}>
                 Invalid
               </Button>
             )}
@@ -203,8 +205,8 @@ class SingleCard extends React.Component {
   }
 
   update(newValid) {
-    axios
-      .put(`${API_URL}/db/update-data`, {
+    apiClient
+      .put('/db/update-data', {
         valid: newValid,
         filename: this.state.item.filename
       })
@@ -213,9 +215,7 @@ class SingleCard extends React.Component {
           this.setState({ value: newValid });
         }
       })
-      .catch(error => {
-        console.log(error);
-      });
+      .catch(error => console.log(error));
   }
 
   render() {
@@ -224,20 +224,10 @@ class SingleCard extends React.Component {
         <div style={{ padding: '8px 0' }}>
           <p style={{ display: "inline", margin: 0 }}>{this.state.item.class}</p>
           <div style={{ marginTop: "10px", display: 'flex', justifyContent: 'space-between' }}>
-            <Button
-              size="small"
-              variant="contained"
-              color="success"
-              onClick={() => this.update(1)}
-            >
+            <Button size="small" variant="contained" color="success" onClick={() => this.update(1)}>
               valid
             </Button>
-            <Button
-              size="small"
-              variant="contained"
-              color="error"
-              onClick={() => this.update(-1)}
-            >
+            <Button size="small" variant="contained" color="error" onClick={() => this.update(-1)}>
               Invalid
             </Button>
           </div>
@@ -250,23 +240,13 @@ class SingleCard extends React.Component {
 
 class PicLink extends React.Component {
   render() {
-    if (this.props.valid === 0) {
-      return (
-        <div>
-          <img onClick={() => this.props.popUp()} src={this.props.url} alt="Kid Draw" />
-        </div>
-      );
-    }
-    if (this.props.valid === 1) {
-      return (
-        <div className="valid">
-          <img onClick={() => this.props.popUp()} src={this.props.url} alt="Kid Draw" />
-        </div>
-      );
-    }
+    const { url, valid } = this.props;
+    if (!url) return <div className="image-box" style={{ backgroundColor: '#f0f0f0' }} />;
+
+    const stateClass = valid === 1 ? 'valid' : valid === -1 ? 'invalid' : '';
     return (
-      <div className="invalid">
-        <img onClick={() => this.props.popUp()} src={this.props.url} alt="Kid Draw" />
+      <div className={`image-box ${stateClass}`}>
+        <img onClick={() => this.props.popUp()} src={url} alt="Kid Draw" />
       </div>
     );
   }

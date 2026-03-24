@@ -8,6 +8,14 @@ const API_URL = process.env.REACT_APP_API_URL;
 // Prolific completion URL — update this when starting a new study
 const PROLIFIC_COMPLETION_URL = "https://app.prolific.co/submissions/complete?cc=294B5DC5mmt";
 
+const checkImages = {};
+
+for (let i = 1; i <= 163; i++) {
+  checkImages[i] = require(
+    `../../assets/check/nonobject_tile_${String(i).padStart(4, '0')}.jpg`
+  );
+}
+console.log(checkImages)
 /*
 A Trial contains props.num images from a single category and a check image
 */
@@ -32,6 +40,7 @@ export class Trial extends React.Component {
             curClass: '',
             checkList: checkFiles,
             snackbarOpen: false,
+            trialStart: null,
         }
     }
 
@@ -54,9 +63,19 @@ export class Trial extends React.Component {
         }
     }
 
-    nextPage() {
+    async nextPage() {
         if (this.state.nextDisable) {
             this.setState({ snackbarOpen: true });
+            let fn = this.state.classIdx % this.state.checkList.length + 1;
+            let filename = `nonobject_tile_${String(fn).padStart(4, '0')}.jpg`;
+            await axios.post(`${API_URL}/db/post-response`, [{
+                filename: filename,
+                class: this.state.curClass,
+                trial_type: 'attention_check',
+                shuffled_index: this.props.shuffledIndex,
+                reaction_time: Date.now() - this.state.trialStart,
+                worker_id: new URLSearchParams(window.location.search).get('PROLIFIC_PID') || 'preview'
+            }]);
             return;
         }
 
@@ -70,7 +89,9 @@ export class Trial extends React.Component {
         }
 
         if (this.state.invalidDrawings.length > 0) {
-            axios.post(`${API_URL}/db/post-response`, this.state.invalidDrawings)
+            const rt = Date.now() - this.state.trialStart;
+            const drawings = this.state.invalidDrawings.map(d => ({ ...d, reaction_time: rt, trial_type: 'invalid_drawing' }));
+            await axios.post(`${API_URL}/db/post-response`, drawings)
                 .then(() => {
                     this.setState({ invalidDrawings: [] });
                 })
@@ -118,9 +139,11 @@ export class Trial extends React.Component {
                             cancelInvalid={this.removeInvalid}
                         />;
                     });
-
-                    let fn = this.state.checkList[this.state.classIdx];
-                    let checkData = { url: require('../../assets/check/' + fn), valid: 0, _id: this.state.classIdx, fname: fn, class: filter.class };
+                    
+                    // 1-indexed
+                    let fn = (this.state.classIdx % this.state.checkList.length) + 1;
+                    console.log(fn)
+                    let checkData = { url: checkImages[fn], valid: 0, _id: this.state.classIdx, filename: fn, class: filter.class };
                     let checkCard = <InvalidCard
                         input={checkData}
                         key={checkData._id}
@@ -132,7 +155,7 @@ export class Trial extends React.Component {
                     toRet.push(checkCard);
                     toRet.sort(() => Math.random() - 0.5);
 
-                    this.setState({ toRet, curClass: filter.class });
+                    this.setState({ toRet, curClass: filter.class, trialStart: Date.now()});
                 }
             })
             .catch((error) => {
@@ -157,8 +180,7 @@ export class Trial extends React.Component {
                     </Box>
 
                     <Box display="flex" justifyContent="center" alignItems="center" style={{ padding: '10px', textAlign: "center" }}>
-                        <Box flex={1}><h3 style={{ textAlign: "center", top: "30px" }}><p>Please identify all invalid drawings of <b>{this.props.allClasses[this.state.classIdx]}</b></p></h3></Box>
-                        <Box flex={1}><h4 style={{ textAlign: "center", top: "30px" }}><p>Remember that unrecognizable drawings are still valid drawings.</p></h4></Box>
+                        <Box flex={1}><h3 style={{ textAlign: "center", top: "30px" }}><p>Please identify all invalid detections of <b>{this.props.allClasses[this.state.classIdx]}</b></p></h3></Box>
                         <Box><img src={refImg} style={{ width: '60px' }} alt="" /></Box>
                     </Box>
                     {this.state.toRet}
@@ -171,7 +193,7 @@ export class Trial extends React.Component {
                     anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
                 >
                     <Alert severity="warning" onClose={() => this.setState({ snackbarOpen: false })}>
-                        There are missing invalid drawings. Please check again!
+                        There are missing invalid detections. Please check again!
                     </Alert>
                 </Snackbar>
             </div>
