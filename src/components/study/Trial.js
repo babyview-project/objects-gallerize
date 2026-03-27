@@ -1,12 +1,14 @@
 import React from "react";
 import { InvalidCard } from "../SingleCard";
-import { Button, Box, Snackbar, Alert } from "@mui/material";
+import { Button, Box, Snackbar, Alert, IconButton, Tooltip } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import axios from "axios";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
 // Prolific completion URL — update this when starting a new study
-const PROLIFIC_COMPLETION_URL = "https://app.prolific.co/submissions/complete?cc=294B5DC5mmt";
+const PROLIFIC_COMPLETION_URL = `https://app.prolific.com/submissions/complete?cc=${process.env.REACT_APP_PROLIFIC_CODE}`;
 
 const checkImages = {};
 
@@ -15,7 +17,7 @@ for (let i = 1; i <= 163; i++) {
     `../../assets/check/nonobject_tile_${String(i).padStart(4, '0')}.jpg`
   );
 }
-console.log(checkImages)
+
 /*
 A Trial contains props.num images from a single category and a check image
 */
@@ -26,10 +28,9 @@ export class Trial extends React.Component {
         this.removeInvalid = this.removeInvalid.bind(this);
         this.findCheck = this.findCheck.bind(this);
         this.cancelCheck = this.cancelCheck.bind(this);
-
-        let checkFiles = Array.from({length: 11}, (x,i) => i.toString() + '.png');
-        checkFiles.sort(() => Math.random() - 0.5);
-
+        this.previewJump = this.previewJump.bind(this);
+        this.previewPrev = this.previewPrev.bind(this);
+        this.previewNext = this.previewNext.bind(this);
         this.state = {
             showPage: props.showPage,
             buttonText: 'Next Category',
@@ -38,9 +39,23 @@ export class Trial extends React.Component {
             nextDisable: false,
             invalidDrawings: [],
             curClass: '',
-            checkList: checkFiles,
+            checkList: checkImages,
             snackbarOpen: false,
             trialStart: null,
+            // For preview: the shuffled_index currently being previewed
+            previewShuffledIndex: props.previewIndex || 1,
+        }
+    }
+
+    componentDidUpdate(prevProps) {
+        if (
+            this.props.previewClass &&
+            prevProps.allClasses.length === 0 &&
+            this.props.allClasses.length > 0
+        ) {
+            console.log(this.props.previewClass, this.props.allClasses);
+            const classIdx = this.props.allClasses.indexOf(this.props.previewClass) - 1;
+            if (classIdx !== -1) this.setState({ classIdx });
         }
     }
 
@@ -63,24 +78,86 @@ export class Trial extends React.Component {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Preview-only navigation
+    // -----------------------------------------------------------------------
+
+    // Jump to an arbitrary class + shuffled_index (called from study.js search bar)
+    previewJump(cls, shuffledIndex) {
+        // Make sure Trial is visible
+        if (!this.state.showPage) {
+            this.setState({ showPage: true });
+        }
+        const classIdx = this.props.allClasses.indexOf(cls);
+        // If class not found or not yet loaded, still try to fetch
+        const effectiveIdx = classIdx !== -1 ? classIdx : this.state.classIdx;
+        this.setState({
+            classIdx: effectiveIdx,
+            previewShuffledIndex: shuffledIndex,
+            nextDisable: false,
+            invalidDrawings: [],
+        });
+        this._fetchPreview(cls, shuffledIndex);
+    }
+
+    // Navigate to prev class in allClasses, same shuffled_index
+    previewPrev() {
+        const nextIdx = this.state.classIdx - 1;
+        if (nextIdx < 0) return;
+        const cls = this.props.allClasses[nextIdx];
+        this.setState({ classIdx: nextIdx, nextDisable: false, invalidDrawings: [] });
+        this._fetchPreview(cls, this.state.previewShuffledIndex);
+    }
+
+    // Navigate to next class in allClasses, same shuffled_index
+    previewNext() {
+        const nextIdx = this.state.classIdx + 1;
+        if (nextIdx >= this.props.allClasses.length) return;
+        const cls = this.props.allClasses[nextIdx];
+        this.setState({ classIdx: nextIdx, nextDisable: false, invalidDrawings: [] });
+        this._fetchPreview(cls, this.state.previewShuffledIndex);
+    }
+
+    // Internal fetch for preview — passes a fixed worker_id so server resolves the
+    // correct shuffled_index assignment from WorkerIndex, but we override via
+    // the previewShuffledIndex state by calling get-single-class directly.
+    _fetchPreview(cls, shuffledIndex) {
+        const filter = {
+            class: cls,
+            num: this.props.num,
+            // Use a synthetic preview worker_id that encodes the index
+            // (store.js already handles worker_ids starting with "preview")
+            worker_id: `preview${shuffledIndex}`,
+        };
+        this.fetch(filter, /* isPreview */ true);
+    }
+
+    // -----------------------------------------------------------------------
+
     async nextPage() {
         if (this.state.nextDisable) {
             this.setState({ snackbarOpen: true });
-            let fn = this.state.classIdx % this.state.checkList.length + 1;
-            let filename = `nonobject_tile_${String(fn).padStart(4, '0')}.jpg`;
-            await axios.post(`${API_URL}/db/post-response`, [{
-                filename: filename,
-                class: this.state.curClass,
-                trial_type: 'attention_check',
-                shuffled_index: this.props.shuffledIndex,
-                reaction_time: Date.now() - this.state.trialStart,
-                worker_id: new URLSearchParams(window.location.search).get('PROLIFIC_PID') || 'preview'
-            }]);
+            console.log(checkImages[this.state.checkFn]);
+            // Skip POST in preview mode
+            if (!this.props.isPreview) {
+                let filename = checkImages[this.state.checkFn].split('/').slice(-1)[0];
+                await axios.post(`${API_URL}/db/post-response`, [{
+                    filename: filename,
+                    class: this.state.curClass,
+                    trial_type: 'attention_check',
+                    shuffled_index: this.props.shuffledIndex,
+                    reaction_time: Date.now() - this.state.trialStart,
+                    worker_id: new URLSearchParams(window.location.search).get('PROLIFIC_PID') || 'preview',
+                    order_index: this.state.classIdx + 1,
+                }]);
+            }
             return;
         }
 
         if (this.state.classIdx === this.props.allClasses.length - 1) {
-            window.location.href = PROLIFIC_COMPLETION_URL;
+            if (!this.props.isPreview) {
+                window.location.href = PROLIFIC_COMPLETION_URL;
+            }
             return;
         }
 
@@ -88,9 +165,10 @@ export class Trial extends React.Component {
             this.setState({ buttonText: 'Submit' });
         }
 
-        if (this.state.invalidDrawings.length > 0) {
+        // Skip POST in preview mode
+        if (!this.props.isPreview && this.state.invalidDrawings.length > 0) {
             const rt = Date.now() - this.state.trialStart;
-            const drawings = this.state.invalidDrawings.map(d => ({ ...d, reaction_time: rt, trial_type: 'invalid_drawing' }));
+            const drawings = this.state.invalidDrawings.map(d => ({ ...d, reaction_time: rt, trial_type: 'invalid_drawing', order_index: this.state.classIdx + 1 }));
             await axios.post(`${API_URL}/db/post-response`, drawings)
                 .then(() => {
                     this.setState({ invalidDrawings: [] });
@@ -98,6 +176,8 @@ export class Trial extends React.Component {
                 .catch(error => {
                     console.log(error);
                 });
+        } else {
+            this.setState({ invalidDrawings: [] });
         }
 
         let nextIdx = this.state.classIdx + 1;
@@ -124,7 +204,7 @@ export class Trial extends React.Component {
         this.setState({ nextDisable: false });
     }
 
-    fetch(filter) {
+    fetch(filter, isPreviewFetch = false) {
         axios.post(`${API_URL}/db/get-single-class`, filter)
             .then(response => {
                 if (response.data.length > 0) {
@@ -139,10 +219,9 @@ export class Trial extends React.Component {
                             cancelInvalid={this.removeInvalid}
                         />;
                     });
-                    
+
                     // 1-indexed
-                    let fn = (this.state.classIdx % this.state.checkList.length) + 1;
-                    console.log(fn)
+                    let fn = Math.floor(Math.random() * Object.keys(this.state.checkList).length) + 1;
                     let checkData = { url: checkImages[fn], valid: 0, _id: this.state.classIdx, filename: fn, class: filter.class };
                     let checkCard = <InvalidCard
                         input={checkData}
@@ -155,7 +234,7 @@ export class Trial extends React.Component {
                     toRet.push(checkCard);
                     toRet.sort(() => Math.random() - 0.5);
 
-                    this.setState({ toRet, curClass: filter.class, trialStart: Date.now()});
+                    this.setState({ toRet, curClass: filter.class, trialStart: Date.now(), checkFn: fn });
                 }
             })
             .catch((error) => {
@@ -171,9 +250,63 @@ export class Trial extends React.Component {
             refImg = require('../../assets/reference/shape_ref.png');
         }
 
+        const { isPreview, allClasses } = this.props;
+        const { classIdx, previewShuffledIndex } = this.state;
+
+        // Preview arrow nav bar
+        const previewNav = isPreview ? (
+            <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                gap={1}
+                style={{
+                    background: '#fff3cd',
+                    border: '1px solid #ffc107',
+                    borderRadius: '6px',
+                    padding: '4px 12px',
+                    margin: '8px auto',
+                    width: 'fit-content',
+                    fontSize: '0.85em',
+                    color: '#856404',
+                }}
+            >
+                <Tooltip title="Previous class">
+                    <span>
+                        <IconButton
+                            size="small"
+                            onClick={this.previewPrev}
+                            disabled={classIdx <= 0}
+                        >
+                            <ArrowBackIcon fontSize="small" />
+                        </IconButton>
+                    </span>
+                </Tooltip>
+                <span style={{ fontWeight: 600 }}>
+                    Preview — idx&nbsp;{previewShuffledIndex}
+                    {classIdx >= 0 && allClasses[classIdx]
+                        ? ` · ${allClasses[classIdx]}`
+                        : ''}
+                    &nbsp;({classIdx + 1}/{allClasses.length})
+                </span>
+                <Tooltip title="Next class">
+                    <span>
+                        <IconButton
+                            size="small"
+                            onClick={this.previewNext}
+                            disabled={classIdx >= allClasses.length - 1}
+                        >
+                            <ArrowForwardIcon fontSize="small" />
+                        </IconButton>
+                    </span>
+                </Tooltip>
+            </Box>
+        ) : null;
+
         return (
             <div style={{ display: this.state.showPage ? "block" : "none" }}>
                 <div>
+                    {previewNav}
                     <Box display="flex" justifyContent="center" alignItems="center" style={{ padding: '10px' }}>
                         <Button variant="contained" onClick={() => this.nextPage()}>{this.state.buttonText}</Button>
                         <div style={{ paddingLeft: '20px' }}> {this.state.classIdx + 1}/{this.props.allClasses.length} </div>

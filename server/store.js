@@ -149,6 +149,16 @@ function serve() {
         log(`preview assigned random shuffled_index ${shuffled_index}`);
         return res.status(200).json({ shuffled_index });
       }
+      else if (worker_id.startsWith('preview')) {
+        const shuffled_index = Number(worker_id.slice(-1));
+        await WorkerIndex.findOneAndUpdate(
+          { worker_id },
+          { worker_id, shuffled_index },
+          { upsert: true, new: true }
+        );
+        log(`preview ${worker_id} assigned shuffled_index ${shuffled_index}`);
+        return res.status(200).json({ shuffled_index });
+      }
 
       // Real worker: return existing assignment if already assigned
       const existing = await WorkerIndex.findOne({ worker_id });
@@ -156,8 +166,17 @@ function serve() {
 
       // Count real workers (excluding preview) per bucket to find the next slot
       const bucketCounts = await WorkerIndex.aggregate([
-        { $match: { worker_id: { $ne: 'preview' } } },
-        { $group: { _id: '$shuffled_index', count: { $sum: 1 } } },
+        {
+          $match: {
+            worker_id: { $not: /^preview/ }
+          }
+        },
+        {
+          $group: {
+            _id: '$shuffled_index',
+            count: { $sum: 1 }
+          }
+        },
         { $sort: { _id: 1 } }
       ]);
 

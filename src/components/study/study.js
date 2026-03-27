@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Chip } from "@mui/material";
+import { Box, Chip, TextField, Button } from "@mui/material";
 import { InvalidCard } from "../SingleCard";
 import { Header } from "../helper/header"
 import axios from "axios";
@@ -13,11 +13,15 @@ class Study extends React.Component {
         super(props);
         this.state = {
             allClasses: [],
-            shuffledIndex: null
+            shuffledIndex: null,
+            // preview search bar local state
+            searchClass: props.previewClass || '',
+            searchIndex: props.previewIndex !== null ? String(props.previewIndex) : '',
         };
         this.enableNextButton = this.enableNextButton.bind(this);
         this.disableNextButton = this.disableNextButton.bind(this);
         this.redirect = this.redirect.bind(this);
+        this.handlePreviewSearch = this.handlePreviewSearch.bind(this);
 
         this.intro = React.createRef();
         this.exp = React.createRef();
@@ -44,8 +48,6 @@ class Study extends React.Component {
             .catch(error => {
                 console.log(error);
             });
-
-        Promise.all([assignIndex, getClasses]);
     }
 
     enableNextButton() {
@@ -58,6 +60,15 @@ class Study extends React.Component {
 
     redirect() {
         this.exp.current.showPage();
+    }
+
+    // Called when the preview search bar submits
+    handlePreviewSearch() {
+        const { searchClass, searchIndex } = this.state;
+        const idx = parseInt(searchIndex);
+        if (!searchClass || isNaN(idx)) return;
+        // Delegate to Trial's preview jump
+        this.exp.current?.previewJump(searchClass, idx);
     }
 
     render() {
@@ -101,11 +112,73 @@ class Study extends React.Component {
         let samplePage = <Practice onChildUpdate={this.enableNextButton} />
         let pages = [consentPage, instruction, samplePage];
 
+        // Preview search bar — only shown in preview mode
+        const previewSearchBar = this.props.isPreview ? (
+            <Box
+                display="flex"
+                alignItems="center"
+                gap={1}
+                style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 1000,
+                    background: '#fff3cd',
+                    borderBottom: '2px solid #ffc107',
+                    padding: '6px 16px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                }}
+            >
+                <span style={{ fontWeight: 700, fontSize: '0.85em', color: '#856404', whiteSpace: 'nowrap' }}>
+                    🔍 Preview
+                </span>
+                <TextField
+                    size="small"
+                    label="Class"
+                    variant="outlined"
+                    value={this.state.searchClass}
+                    onChange={e => this.setState({ searchClass: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') this.handlePreviewSearch(); }}
+                    style={{ background: '#fff', width: 180 }}
+                />
+                <TextField
+                    size="small"
+                    label="Shuffled Index"
+                    variant="outlined"
+                    type="number"
+                    value={this.state.searchIndex}
+                    onChange={e => this.setState({ searchIndex: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') this.handlePreviewSearch(); }}
+                    style={{ background: '#fff', width: 140 }}
+                />
+                <Button
+                    variant="contained"
+                    size="small"
+                    onClick={this.handlePreviewSearch}
+                    style={{ background: '#ffc107', color: '#333', fontWeight: 700 }}
+                >
+                    Go
+                </Button>
+            </Box>
+        ) : null;
+
         return (
-            <div>
+            <div style={{ paddingTop: this.props.isPreview ? '52px' : 0 }}>
+                {previewSearchBar}
                 <Header title="Object detection validation study" />
                 <Timeline ref={this.intro} pages={pages} showPage={true} finalText="Start the Study" redirect={this.redirect} />
-                <Trial ref={this.exp} allClasses={this.state.allClasses} showPage={false} finalText="Finish" shuffledIndex={this.state.shuffledIndex} num={25} />
+                <Trial
+                    ref={this.exp}
+                    allClasses={this.state.allClasses}
+                    showPage={false}
+                    finalText="Finish"
+                    shuffledIndex={this.state.shuffledIndex}
+                    num={25}
+                    previewClass={this.props.previewClass}
+                    previewIndex={this.props.previewIndex}
+                    isPreview={this.props.isPreview}
+                />
             </div>
         );
     }

@@ -14,6 +14,10 @@ const responseSchema = new Schema({
         type: Number,
         required: true
     },
+    order_index: {
+        type: Number,
+        required: true
+    },
     worker_id:{
         type: String,
         required: true
@@ -27,6 +31,10 @@ const responseSchema = new Schema({
         required: false
     },
     reaction_time: {
+        type: Number,
+        required: false
+    },
+    total_study_time: {
         type: Number,
         required: false
     }
